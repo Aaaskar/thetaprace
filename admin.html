@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Админка — визиты бара</title>
+<style>
+  body { font-family: -apple-system, sans-serif; margin: 0; padding: 20px;
+         background: #f5f5f7; color: #111; max-width: 720px; }
+  h1 { font-size: 22px; }
+  h2 { font-size: 16px; margin-top: 28px; }
+  input, button { font-size: 15px; padding: 10px; border-radius: 8px;
+                  border: 1px solid #ccc; }
+  button { background: #2481cc; color: #fff; border: none; cursor: pointer; }
+  button:hover { opacity: 0.9; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  td, th { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; font-size: 14px; }
+  .card { background: #fff; border-radius: 12px; padding: 16px; margin-top: 12px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  #qrBox img { display: block; margin-top: 12px; width: 220px; }
+  #loginBox { max-width: 320px; margin-top: 60px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+</style>
+</head>
+<body>
+
+<div id="loginBox">
+  <h1>Вход в админку</h1>
+  <div class="row">
+    <input id="password" type="password" placeholder="Пароль" />
+    <button onclick="login()">Войти</button>
+  </div>
+  <p id="loginError" style="color:red;"></p>
+</div>
+
+<div id="dashboard" style="display:none;">
+  <div class="row" style="justify-content: space-between;">
+    <h1>Визиты гостей</h1>
+    <button onclick="logout()">Выйти</button>
+  </div>
+
+  <div class="card">
+    <h2>Сгенерировать QR для официанта</h2>
+    <div class="row">
+      <input id="label" placeholder="Подпись (например: Смена 25.09)" />
+      <input id="expires" type="number" placeholder="Действует, часов (пусто = бессрочно)" style="width:220px" />
+      <button onclick="newCode()">Создать QR</button>
+    </div>
+    <div id="qrBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>Последние визиты</h2>
+    <table>
+      <thead><tr><th>Гость</th><th>Телефон</th><th>Дата</th></tr></thead>
+      <tbody id="visitsBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+async function login() {
+  const password = document.getElementById('password').value;
+  const res = await fetch('/api/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password })
+  });
+  if (res.ok) {
+    document.getElementById('loginBox').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    loadVisits();
+  } else {
+    document.getElementById('loginError').textContent = 'Неверный пароль';
+  }
+}
+
+async function logout() {
+  await fetch('/api/admin/logout', { method: 'POST' });
+  location.reload();
+}
+
+async function loadVisits() {
+  const res = await fetch('/api/admin/visits');
+  if (!res.ok) return;
+  const data = await res.json();
+  const body = document.getElementById('visitsBody');
+  body.innerHTML = data.visits.map(v => {
+    const d = new Date(v.created_at).toLocaleString('ru-RU');
+    const name = v.guests ? v.guests.name : '—';
+    const phone = v.guests ? (v.guests.phone || '—') : '—';
+    return `<tr><td>${name}</td><td>${phone}</td><td>${d}</td></tr>`;
+  }).join('');
+}
+
+async function newCode() {
+  const label = document.getElementById('label').value;
+  const expiresInHours = document.getElementById('expires').value || null;
+  const res = await fetch('/api/admin/codes/new', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label, expiresInHours })
+  });
+  const data = await res.json();
+  document.getElementById('qrBox').innerHTML =
+    `<img src="${data.qrDataUrl}" />
+     <p>Код: <b>${data.code}</b></p>
+     <p>Ссылка: <a href="${data.deepLink}" target="_blank">${data.deepLink}</a></p>`;
+}
+</script>
+</body>
+</html>
