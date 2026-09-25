@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Мои визиты</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  body { font-family: -apple-system, sans-serif; margin: 0; padding: 16px;
+         background: var(--tg-theme-bg-color, #fff);
+         color: var(--tg-theme-text-color, #111); }
+  h1 { font-size: 20px; }
+  .visit { padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.05);
+           margin-bottom: 8px; }
+  .empty { opacity: 0.6; text-align: center; margin-top: 40px; }
+  .count { font-size: 32px; font-weight: 700; text-align: center; margin: 20px 0; }
+</style>
+</head>
+<body>
+  <h1>Мои визиты</h1>
+  <div id="count" class="count"></div>
+  <div id="list"></div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    async function load() {
+      const res = await fetch('/api/my-visits', {
+        headers: { 'X-Telegram-Init-Data': tg.initData }
+      });
+      const data = await res.json();
+      const list = document.getElementById('list');
+      const count = document.getElementById('count');
+
+      if (!data.visits || data.visits.length === 0) {
+        count.textContent = '';
+        list.innerHTML = '<div class="empty">Пока нет ни одного визита.<br>Отсканируйте QR у официанта в баре.</div>';
+        return;
+      }
+
+      count.textContent = data.visits.length + (data.visits.length === 1 ? ' визит' : ' визитов');
+
+      list.innerHTML = data.visits.map(v => {
+        const d = new Date(v.created_at);
+        const dateStr = d.toLocaleString('ru-RU', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+        return `<div class="visit">${dateStr}</div>`;
+      }).join('');
+    }
+
+    load();
+  </script>
+</body>
+</html>
